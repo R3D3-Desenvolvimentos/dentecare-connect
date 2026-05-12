@@ -14,7 +14,71 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      conversations: {
+        Row: {
+          contact_name: string
+          id: string
+          last_message_at: string
+          message_count: number
+          phone_number: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          contact_name: string
+          id?: string
+          last_message_at?: string
+          message_count?: number
+          phone_number: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          contact_name?: string
+          id?: string
+          last_message_at?: string
+          message_count?: number
+          phone_number?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          direction: string
+          id: string
+          phone_number: string
+          sent_at: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          direction: string
+          id?: string
+          phone_number: string
+          sent_at?: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          direction?: string
+          id?: string
+          phone_number?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
