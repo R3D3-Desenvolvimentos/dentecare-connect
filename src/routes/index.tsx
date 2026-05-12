@@ -153,22 +153,17 @@ function Dashboard() {
             Monitoramento em tempo real das conversas do agente WhatsApp
           </p>
         </div>
-        <MetricsCards {...metrics} />
+        <MetricsCards {...metrics} loading={loading} />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ConversationsChart data={chartData} />
-          <IntentsChart data={intentCounts} />
+          <ConversationsChart data={chartData} loading={loading} />
+          <IntentsChart data={intentCounts} loading={loading} />
         </div>
-        {loading ? (
-          <div className="rounded-2xl border border-border bg-card p-12 text-center text-muted-foreground">
-            Carregando conversas...
-          </div>
-        ) : (
-          <ConversationsTable
-            conversations={conversations}
-            onSelect={handleSelect}
-            selectedId={selected?.id}
-          />
-        )}
+        <ConversationsTable
+          conversations={conversations}
+          onSelect={handleSelect}
+          selectedId={selected?.id}
+          loading={loading}
+        />
       </main>
       <ConversationDetail conversation={selected} open={open} onOpenChange={setOpen} />
     </div>

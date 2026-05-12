@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, Search, Phone as PhoneIcon, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDuration, type EnrichedConversation, type Sentiment } from "@/lib/conversation-analysis";
 
@@ -40,9 +41,10 @@ interface Props {
   conversations: EnrichedConversation[];
   onSelect: (c: EnrichedConversation) => void;
   selectedId?: string;
+  loading?: boolean;
 }
 
-export function ConversationsTable({ conversations, onSelect, selectedId }: Props) {
+export function ConversationsTable({ conversations, onSelect, selectedId, loading }: Props) {
   const [nameQuery, setNameQuery] = useState("");
   const [phoneQuery, setPhoneQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -158,14 +160,30 @@ export function ConversationsTable({ conversations, onSelect, selectedId }: Prop
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.length === 0 && (
+            {loading && Array.from({ length: 5 }).map((_, i) => (
+              <TableRow key={`skel-${i}`} style={{ animationDelay: `${i * 50}ms` }}>
+                <TableCell className="px-5 py-3">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="size-9 rounded-full" />
+                    <Skeleton className="h-4 w-28" />
+                  </div>
+                </TableCell>
+                <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                <TableCell className="text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                <TableCell className="text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+                <TableCell className="text-right pr-5"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+              </TableRow>
+            ))}
+            {!loading && filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                   Nenhuma conversa encontrada
                 </TableCell>
               </TableRow>
             )}
-            {filtered.map((c) => {
+            {!loading && filtered.map((c) => {
               const s = sentimentStyles[c.sentiment];
               return (
                 <TableRow
