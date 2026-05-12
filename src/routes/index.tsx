@@ -1,15 +1,44 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useCallback } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { DashboardHeader } from "@/components/dashboard/Header";
 import { MetricsCards } from "@/components/dashboard/MetricsCards";
 import { ConversationsChart } from "@/components/dashboard/ConversationsChart";
-import { ConversationsTable, type Conversation } from "@/components/dashboard/ConversationsTable";
+import { IntentsChart } from "@/components/dashboard/IntentsChart";
+import { ConversationsTable } from "@/components/dashboard/ConversationsTable";
 import { ConversationDetail } from "@/components/dashboard/ConversationDetail";
+import {
+  enrichConversations,
+  formatDuration,
+  type ConversationRow,
+  type EnrichedConversation,
+  type Intent,
+  type Message,
+} from "@/lib/conversation-analysis";
 
 export const Route = createFileRoute("/")({
-  component: Dashboard,
+  component: DashboardRoute,
 });
+
+function DashboardRoute() {
+  const { session, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !session) navigate({ to: "/login" });
+  }, [loading, session, navigate]);
+
+  if (loading || !session) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  return <Dashboard />;
+}
 
 function startOfToday() {
   const d = new Date();
@@ -39,10 +68,10 @@ function buildLast7Days(rows: { started_at: string }[]) {
 }
 
 function Dashboard() {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<EnrichedConversation[]>([]);
   const [totalMessages, setTotalMessages] = useState(0);
   const [chartData, setChartData] = useState<{ day: string; count: number }[]>([]);
-  const [selected, setSelected] = useState<Conversation | null>(null);
+  const [selected, setSelected] = useState<EnrichedConversation | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -54,17 +83,25 @@ function Dashboard() {
     const [convRes, msgRes, recentRes] = await Promise.all([
       supabase
         .from("conversations")
-        .select("id, contact_name, phone_number, status, message_count, last_message_at, started_at")
+        .select("*")
         .order("last_message_at", { ascending: false }),
-      supabase.from("messages").select("id", { count: "exact", head: true }),
+      supabase.from("messages").select("*"),
       supabase
         .from("conversations")
         .select("started_at")
         .gte("started_at", sevenDaysAgo.toISOString()),
     ]);
 
-    if (convRes.data) setConversations(convRes.data as Conversation[]);
-    if (typeof msgRes.count === "number") setTotalMessages(msgRes.count);
+    const rows: ConversationRow[] = convRes.data ?? [];
+    const messages: Message[] = msgRes.data ?? [];
+    const byConv = new Map<string, Message[]>();
+    for (const m of messages) {
+      const arr = byConv.get(m.conversation_id) ?? [];
+      arr.push(m);
+      byConv.set(m.conversation_id, arr);
+    }
+    setConversations(enrichConversations(rows, byConv));
+    setTotalMessages(messages.length);
     if (recentRes.data) setChartData(buildLast7Days(recentRes.data));
     setLoading(false);
   }, []);
@@ -76,14 +113,32 @@ function Dashboard() {
   }, [loadAll]);
 
   const todayStart = startOfToday();
+
+  const intentCounts = useMemo<Record<Intent, number>>(() => {
+    const acc: Record<Intent, number> = { agendamento: 0, orcamento: 0, emergencia: 0, duvida: 0 };
+    for (const c of conversations) acc[c.intent] += 1;
+    return acc;
+  }, [conversations]);
+
+  const avgResponseLabel = useMemo(() => {
+    const values = conversations.map((c) => c.avgResponseMs).filter((v): v is number => v !== null);
+    if (values.length === 0) return "—";
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    return formatDuration(avg);
+  }, [conversations]);
+
+  const needsAttentionCount = conversations.filter((c) => c.needsAttention).length;
+
   const metrics = {
     totalConversations: conversations.length,
     activeConversations: conversations.filter((c) => c.status === "active").length,
     totalMessages,
     conversationsToday: conversations.filter((c) => new Date(c.started_at) >= todayStart).length,
+    needsAttentionCount,
+    avgResponseLabel,
   };
 
-  const handleSelect = (c: Conversation) => {
+  const handleSelect = (c: EnrichedConversation) => {
     setSelected(c);
     setOpen(true);
   };
@@ -99,7 +154,10 @@ function Dashboard() {
           </p>
         </div>
         <MetricsCards {...metrics} />
-        <ConversationsChart data={chartData} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ConversationsChart data={chartData} />
+          <IntentsChart data={intentCounts} />
+        </div>
         {loading ? (
           <div className="rounded-2xl border border-border bg-card p-12 text-center text-muted-foreground">
             Carregando conversas...
