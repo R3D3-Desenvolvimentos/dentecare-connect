@@ -1,0 +1,1 @@
+ALTER TABLE public.conversations ADD CONSTRAINT conversations_phone_number_key UNIQUE (phone_number);
