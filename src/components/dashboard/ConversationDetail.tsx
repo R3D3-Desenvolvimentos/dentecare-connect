@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Phone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import type { Conversation } from "./ConversationsTable";
+import type { EnrichedConversation } from "@/lib/conversation-analysis";
 
 interface Msg {
   id: string;
@@ -12,7 +12,7 @@ interface Msg {
 }
 
 interface Props {
-  conversation: Conversation | null;
+  conversation: EnrichedConversation | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
