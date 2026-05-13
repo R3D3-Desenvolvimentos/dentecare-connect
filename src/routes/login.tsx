@@ -11,6 +11,40 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+const PASSWORD_MIN_LENGTH = 6;
+
+function translateAuthError(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("password should be at least")) {
+    return `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`;
+  }
+  if (m.includes("password is too weak") || m.includes("weak password")) {
+    return "Senha muito fraca. Use uma combinação mais forte de caracteres.";
+  }
+  if (m.includes("password") && m.includes("pwned")) {
+    return "Esta senha foi encontrada em vazamentos de dados. Escolha outra senha.";
+  }
+  if (m.includes("invalid login credentials")) {
+    return "Email ou senha inválidos.";
+  }
+  if (m.includes("email not confirmed")) {
+    return "Email ainda não confirmado. Verifique sua caixa de entrada.";
+  }
+  if (m.includes("user already registered")) {
+    return "Este email já está cadastrado. Faça login.";
+  }
+  if (m.includes("invalid email")) {
+    return "Email inválido.";
+  }
+  if (m.includes("rate limit") || m.includes("too many requests")) {
+    return "Muitas tentativas. Aguarde alguns instantes e tente novamente.";
+  }
+  if (m.includes("network") || m.includes("failed to fetch")) {
+    return "Erro de conexão. Verifique sua internet e tente novamente.";
+  }
+  return message;
+}
+
 function LoginPage() {
   const { signIn, signUp, session, loading } = useAuth();
   const navigate = useNavigate();
@@ -30,7 +64,7 @@ function LoginPage() {
     const { error } = mode === "signin" ? await signIn(email, password) : await signUp(email, password);
     setSubmitting(false);
     if (error) {
-      toast.error(error);
+      toast.error(translateAuthError(error));
       return;
     }
     if (mode === "signup") {
@@ -80,9 +114,16 @@ function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={PASSWORD_MIN_LENGTH}
                 autoComplete={mode === "signin" ? "current-password" : "new-password"}
               />
+              {mode === "signup" && (
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  A senha deve ter no mínimo {PASSWORD_MIN_LENGTH} caracteres. Para mais
+                  segurança, use uma combinação de letras maiúsculas e minúsculas, números
+                  e símbolos (ex.: <span className="font-mono">! @ # $ %</span>).
+                </p>
+              )}
             </div>
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting && <Loader2 className="size-4 animate-spin" />}
