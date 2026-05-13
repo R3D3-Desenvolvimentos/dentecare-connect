@@ -1,0 +1,265 @@
+{
+  "name": "DenteCare - Agente IA WhatsApp v2",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "clinica-whatsapp",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "dc000001-0000-0000-0000-000000000001",
+      "name": "Webhook - Receber Mensagem",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1000, 0],
+      "webhookId": "dentecare-whatsapp-v2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body       = $input.first().json.body;\nconst event      = body?.event;\nconst key        = body?.data?.key ?? {};\nconst fromMe     = key.fromMe;\nconst remoteJid  = key.remoteJid ?? '';\nconst msgData    = body?.data?.message ?? {};\nconst text       = msgData.conversation ?? msgData.extendedTextMessage?.text ?? null;\n\nif (fromMe === true || event !== 'messages.upsert' || remoteJid.includes('@g.us') || !text) {\n  return [];\n}\n\nconst telefone = remoteJid\n  .replace('@s.whatsapp.net', '')\n  .replace('@g.us', '')\n  .replace('@lid', '');\n\nreturn [{\n  json: {\n    remoteJid,\n    telefone,\n    mensagem:    text,\n    nomeContato: body?.data?.pushName ?? 'Cliente',\n    sessionId:   remoteJid,\n    instancia:   body?.instance ?? ''\n  }\n}];\n"
+      },
+      "id": "dc000001-0000-0000-0000-000000000002",
+      "name": "Filtrar e Extrair Mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-760, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://navtapzfqtfnazroivsq.supabase.co/rest/v1/conversations?on_conflict=phone_number",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hdnRhcHpmcXRmbmF6cm9pdnNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MTM5NDcsImV4cCI6MjA5NDE4OTk0N30.HpWhYNi7pE-9R9JmoFendJ1oeVWcX1ZN_Td2t-TNAI4"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hdnRhcHpmcXRmbmF6cm9pdnNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MTM5NDcsImV4cCI6MjA5NDE4OTk0N30.HpWhYNi7pE-9R9JmoFendJ1oeVWcX1ZN_Td2t-TNAI4"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"phone_number\": \"{{ $json.telefone }}\",\n  \"contact_name\": \"{{ $json.nomeContato }}\",\n  \"last_message_at\": \"{{ $now.toISO() }}\",\n  \"status\": \"active\"\n}",
+        "options": {}
+      },
+      "id": "dc000001-0000-0000-0000-000000000003",
+      "name": "Upsert Conversa no Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-520, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://navtapzfqtfnazroivsq.supabase.co/rest/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hdnRhcHpmcXRmbmF6cm9pdnNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MTM5NDcsImV4cCI6MjA5NDE4OTk0N30.HpWhYNi7pE-9R9JmoFendJ1oeVWcX1ZN_Td2t-TNAI4"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hdnRhcHpmcXRmbmF6cm9pdnNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MTM5NDcsImV4cCI6MjA5NDE4OTk0N30.HpWhYNi7pE-9R9JmoFendJ1oeVWcX1ZN_Td2t-TNAI4"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"conversation_id\": \"{{ $json.id }}\",\n  \"phone_number\": \"{{ $('Filtrar e Extrair Mensagem').item.json.telefone }}\",\n  \"content\": \"{{ $('Filtrar e Extrair Mensagem').item.json.mensagem }}\",\n  \"direction\": \"inbound\",\n  \"sent_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "dc000001-0000-0000-0000-000000000004",
+      "name": "Salvar Mensagem Recebida",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-280, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://navtapzfqtfnazroivsq.supabase.co/rest/v1/messages?conversation_id=eq.{{ $('Upsert Conversa no Supabase').item.json.id }}&order=sent_at.asc&limit=20",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hdnRhcHpmcXRmbmF6cm9pdnNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MTM5NDcsImV4cCI6MjA5NDE4OTk0N30.HpWhYNi7pE-9R9JmoFendJ1oeVWcX1ZN_Td2t-TNAI4"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hdnRhcHpmcXRmbmF6cm9pdnNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MTM5NDcsImV4cCI6MjA5NDE4OTk0N30.HpWhYNi7pE-9R9JmoFendJ1oeVWcX1ZN_Td2t-TNAI4"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dc000001-0000-0000-0000-000000000005",
+      "name": "Buscar Historico",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-40, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "var allItems = $input.all();\nvar raw = allItems[0].json;\nvar mensagens = Array.isArray(raw) ? raw : allItems.map(function(i) { return i.json; });\n\nvar filtrar = $('Filtrar e Extrair Mensagem').all()[0].json;\nvar nome = filtrar.nomeContato || 'Cliente';\nvar msgAtual = filtrar.mensagem || '';\n\nvar historico = mensagens.slice(0, -1);\n\nvar prompt = '';\n\nif (historico.length > 0) {\n  var linhas = '';\n  for (var i = 0; i < historico.length; i++) {\n    var role = historico[i].direction === 'inbound' ? nome : 'Clara';\n    linhas += role + ': ' + historico[i].content + '\\n';\n  }\n  prompt += '[HISTORICO DA CONVERSA - voce JA se apresentou, NAO se reapresente]\\n' + linhas + '[FIM DO HISTORICO]\\n\\n';\n  prompt += 'Nova mensagem de ' + nome + ': ' + msgAtual;\n} else {\n  prompt += '[PRIMEIRA MENSAGEM - apresente-se brevemente como Clara da DenteCare e pergunte como pode ajudar]\\n';\n  prompt += nome + ': ' + msgAtual;\n}\n\nreturn [{ json: { prompt: prompt, primeiraMsg: historico.length === 0, historicoLength: historico.length, totalMsgs: mensagens.length } }];\n"
+      },
+      "id": "dc000001-0000-0000-0000-000000000006",
+      "name": "Montar Contexto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {
+          "systemMessage": "Voce e Clara, atendente virtual da Clinica Odontologica DenteCare. Seja cordial, profissional e objetiva. Responda SEMPRE em portugues do Brasil, maximo 3 paragrafos curtos. Nunca use aspas duplas.\n\nSERVICOS: Limpeza R$150 | Clareamento R$800 | Restauracao R$200/dente | Extracao simples R$250 | Canal R$1.200 | Aparelho/Implante: orcamento na consulta | Avaliacao gratuita disponivel.\nHORARIOS: Seg-Sex 8h-18h | Sabado 8h-13h | Domingo/Feriados fechado.\nENDERECO: Rua das Flores, 123 - Centro. Tel: (11) 3456-7890.\n\nCOMO RESPONDER: Se o prompt comecar com [HISTORICO DA CONVERSA], voce JA se apresentou antes - continue a conversa diretamente SEM repetir sua apresentacao. Se comecar com [PRIMEIRA MENSAGEM], apresente-se brevemente e pergunte como pode ajudar.\nEMERGENCIA (dor forte, sangramento, dente quebrado): oriente ligar IMEDIATAMENTE para (11) 3456-7890.\nFinalize sempre perguntando se pode ajudar em mais algo."
+        }
+      },
+      "id": "dc000001-0000-0000-0000-000000000007",
+      "name": "Agente Clara",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [460, 0]
+    },
+    {
+      "parameters": {
+        "modelName": "gemini-2.0-flash",
+        "options": {
+          "temperature": 0.7
+        }
+      },
+      "id": "dc000001-0000-0000-0000-000000000008",
+      "name": "Gemini Flash",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [460, 220],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "9V9dil2oCok5tub3",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var jid         = $('Filtrar e Extrair Mensagem').all()[0].json.remoteJid;\nvar conversaId  = $('Upsert Conversa no Supabase').all()[0].json.id;\nvar phoneNumber = $('Upsert Conversa no Supabase').all()[0].json.phone_number;\nvar resposta    = $json.output.replace(/\\n/g, ' ').replace(/\"/g, \"'\").trim();\n\nreturn [{ json: { jid: jid, conversaId: conversaId, phoneNumber: phoneNumber, resposta: resposta } }];\n"
+      },
+      "id": "dc000001-0000-0000-0000-000000000009",
+      "name": "Preparar Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://a5d0-2804-584-a1ab-2b00-8d80-9a45-b65d-672d.ngrok-free.app/message/sendText/clinica-dente-care",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.jid }}\",\n  \"text\": \"{{ $json.resposta }}\",\n  \"delay\": 1200\n}",
+        "options": {}
+      },
+      "id": "dc000001-0000-0000-0000-000000000010",
+      "name": "Enviar Resposta WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [960, 0],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "i4zagjf7MZ5JMorN",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://navtapzfqtfnazroivsq.supabase.co/rest/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hdnRhcHpmcXRmbmF6cm9pdnNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MTM5NDcsImV4cCI6MjA5NDE4OTk0N30.HpWhYNi7pE-9R9JmoFendJ1oeVWcX1ZN_Td2t-TNAI4"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hdnRhcHpmcXRmbmF6cm9pdnNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MTM5NDcsImV4cCI6MjA5NDE4OTk0N30.HpWhYNi7pE-9R9JmoFendJ1oeVWcX1ZN_Td2t-TNAI4"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"conversation_id\": \"{{ $('Preparar Resposta').item.json.conversaId }}\",\n  \"phone_number\": \"{{ $('Preparar Resposta').item.json.phoneNumber }}\",\n  \"content\": \"{{ $('Preparar Resposta').item.json.resposta }}\",\n  \"direction\": \"outbound\",\n  \"sent_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "dc000001-0000-0000-0000-000000000011",
+      "name": "Salvar Resposta Clara",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1200, 0]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Receber Mensagem": {
+      "main": [[{"node": "Filtrar e Extrair Mensagem", "type": "main", "index": 0}]]
+    },
+    "Filtrar e Extrair Mensagem": {
+      "main": [[{"node": "Upsert Conversa no Supabase", "type": "main", "index": 0}]]
+    },
+    "Upsert Conversa no Supabase": {
+      "main": [[{"node": "Salvar Mensagem Recebida", "type": "main", "index": 0}]]
+    },
+    "Salvar Mensagem Recebida": {
+      "main": [[{"node": "Buscar Historico", "type": "main", "index": 0}]]
+    },
+    "Buscar Historico": {
+      "main": [[{"node": "Montar Contexto", "type": "main", "index": 0}]]
+    },
+    "Montar Contexto": {
+      "main": [[{"node": "Agente Clara", "type": "main", "index": 0}]]
+    },
+    "Gemini Flash": {
+      "ai_languageModel": [[{"node": "Agente Clara", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Agente Clara": {
+      "main": [[{"node": "Preparar Resposta", "type": "main", "index": 0}]]
+    },
+    "Preparar Resposta": {
+      "main": [[{"node": "Enviar Resposta WhatsApp", "type": "main", "index": 0}]]
+    },
+    "Enviar Resposta WhatsApp": {
+      "main": [[{"node": "Salvar Resposta Clara", "type": "main", "index": 0}]]
+    },
+    "Salvar Resposta Clara": {
+      "main": [[]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "dc000003-0000-0000-0000-000000000000",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a9590dc0a1f39ed0d56f97ff8f1c203b54351d616f02ae5b51bd57401fc5f51c"
+  },
+  "id": "",
+  "tags": []
+}

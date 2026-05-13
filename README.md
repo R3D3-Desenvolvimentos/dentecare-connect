@@ -26,9 +26,94 @@ Dashboard de monitoramento em tempo real para o agente de atendimento WhatsApp d
 - Tema claro/escuro
 - Autenticação com email e senha
 
+## Agente N8N (Desafio 1)
+
+O workflow do agente está em [`n8n/dentecare-agente-ia-whatsapp.json`](n8n/dentecare-agente-ia-whatsapp.json).
+
+### Como importar no N8N
+
+1. Abra o N8N e crie um novo workflow
+2. Menu (⋮) → **Import from file** → selecione `n8n/dentecare-agente-ia-whatsapp.json`
+3. Configure as credentials:
+   - **Google Gemini**: vincule sua API key no nó `Gemini Flash` (modelo: `gemini-2.0-flash`)
+   - **Evolution API**: atualize a URL do ngrok no nó `Enviar Resposta WhatsApp` e configure o header `apikey` com sua chave da Evolution API
+   - **Supabase**: as URLs e chaves anon já estão no JSON (projeto `navtapzfqtfnazroivsq`)
+4. No Evolution API, configure o webhook apontando para a URL do nó `Webhook - Receber Mensagem`
+5. Ative o workflow
+
+### Arquitetura do agente
+
+```
+WhatsApp → Evolution API → N8N Webhook
+                                │
+                    ┌───────────▼────────────┐
+                    │  Filtrar e Extrair     │  Filtra grupos, msgs próprias
+                    │  Mensagem (Code)       │  e eventos não relevantes
+                    └───────────┬────────────┘
+                                │
+                    ┌───────────▼────────────┐
+                    │  Upsert Conversa       │  Cria ou atualiza conversa
+                    │  (Supabase)            │  por phone_number
+                    └───────────┬────────────┘
+                                │
+                    ┌───────────▼────────────┐
+                    │  Salvar Mensagem       │  Persiste msg inbound
+                    │  Recebida (Supabase)   │  com conversation_id
+                    └───────────┬────────────┘
+                                │
+                    ┌───────────▼────────────┐
+                    │  Buscar Histórico      │  Últimas 20 msgs da
+                    │  (Supabase GET)        │  conversa (asc)
+                    └───────────┬────────────┘
+                                │
+                    ┌───────────▼────────────┐
+                    │  Montar Contexto       │  Monta prompt com histórico
+                    │  (Code)               │  + mensagem atual
+                    └───────────┬────────────┘
+                                │
+                    ┌───────────▼────────────┐
+                    │  Agente Clara          │  Gemini 2.0 Flash
+                    │  (AI Agent)            │  com contexto completo
+                    └───────────┬────────────┘
+                                │
+                    ┌───────────▼────────────┐
+                    │  Enviar via            │  Evolution API
+                    │  WhatsApp (HTTP)       │  sendText
+                    └───────────┬────────────┘
+                                │
+                    ┌───────────▼────────────┐
+                    │  Salvar Resposta       │  Persiste msg outbound
+                    │  Clara (Supabase)      │  no histórico
+                    └───────────┘
+```
+
+### Diferenciais implementados
+
+- **Memória de conversa**: histórico persistido no Supabase, reconstruído a cada execução — não depende de memória volátil do N8N
+- **Separação de intents**: o agente identifica e responde diferentemente para agendamento, orçamento, emergência e dúvidas gerais
+- **Suporte a JIDs `@lid`**: compatível com contatos WhatsApp multi-device (requer patch no Evolution API — ver abaixo)
+
+### Patch Evolution API para JIDs `@lid`
+
+Contatos com WhatsApp multi-device usam JIDs no formato `123456789@lid`. Para suporte, aplique o patch no container:
+
+```bash
+# 1. Copie o arquivo para edição
+docker cp evolution_api:/evolution/dist/main.js ./main.js
+
+# 2. Busque a linha:
+# !n.jid.includes("@broadcast"))throw new f(n)
+# e substitua por:
+# !n.jid.includes("@broadcast")&&!n.jid.includes("@lid"))throw new f(n)
+
+# 3. Copie de volta e reinicie
+docker cp ./main.js evolution_api:/evolution/dist/main.js
+docker restart evolution_api
+```
+
 ## Integração com o Agente (Desafio 1)
 
-O agente de WhatsApp construído no N8N (Desafio 1) grava automaticamente cada conversa e mensagem no Supabase via HTTP Request nodes após cada interação. O dashboard consome esses dados em tempo real sem dados mockados.
+O agente grava automaticamente cada conversa e mensagem no Supabase via HTTP Request nodes após cada interação. O dashboard consome esses dados em tempo real sem dados mockados.
 
 Fluxo de dados:
 ```
