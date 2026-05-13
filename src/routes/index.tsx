@@ -109,7 +109,25 @@ function Dashboard() {
   useEffect(() => {
     loadAll();
     const id = setInterval(loadAll, 30_000);
-    return () => clearInterval(id);
+
+    const channel = supabase
+      .channel("dashboard-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "conversations" },
+        () => loadAll(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "messages" },
+        () => loadAll(),
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(id);
+      supabase.removeChannel(channel);
+    };
   }, [loadAll]);
 
   const todayStart = startOfToday();
