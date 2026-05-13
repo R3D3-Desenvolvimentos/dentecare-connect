@@ -234,3 +234,4 @@ CREATE TABLE messages (
 **Onde a IA precisou de ajuste:**
 - A análise de sentimento e intenções foi implementada no frontend com listas de palavras-chave; em produção seria mais robusto usar um modelo de linguagem via Edge Function do Supabase
 - O cálculo de tempo médio de resposta assume que mensagens estão ordenadas por timestamp, o que depende de dados consistentes do N8N
+- Diversas vezes a IA confundiu a sintaxe do javascript, colocando "" em strings no lugar de '', assim causando erros e inconsistências no dashboard 
