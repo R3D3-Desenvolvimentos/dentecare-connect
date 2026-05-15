@@ -136,9 +136,15 @@ bun install
 
 ### Variáveis de Ambiente
 
-> **Nota:** As variáveis de ambiente estão incluídas no repositório pois este projeto foi gerado pela plataforma Lovable, que gerencia as credenciais do Supabase diretamente no repositório para facilitar o deploy contínuo. Em um ambiente de produção real, as credenciais seriam gerenciadas via secrets do CI/CD.
+> ⚠️ **Por que o `.env` está commitado?**
+>
+> Este projeto foi gerado e gerenciado pela plataforma **Lovable**, que commita as variáveis de ambiente diretamente no repositório como parte do seu fluxo de deploy contínuo. Isso é intencional na plataforma — não representa uma falha de segurança.
+>
+> **O banco de dados Supabase utilizado é exclusivo para este teste técnico e não contém nenhum dado sensível, pessoal ou verídico.** Todos os dados são fictícios, gerados durante os testes do agente. As credenciais expostas são a chave `anon` pública do Supabase, que por definição é segura para ser exposta no frontend.
+>
+> Em um projeto de produção real, as credenciais seriam gerenciadas via secrets do CI/CD (GitHub Actions Secrets, Vercel Environment Variables, etc.) e o `.env` estaria no `.gitignore`.
 
-As credenciais do Supabase já estão no arquivo `.env` do repositório. Para rodar com seu próprio projeto Supabase, crie um `.env` baseado no `.env.example`:
+Para rodar com seu próprio projeto Supabase, crie um `.env` baseado no `.env.example`:
 
 ```bash
 cp .env.example .env
